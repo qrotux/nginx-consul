@@ -1,0 +1,62 @@
+version: '3.4'
+
+services:
+
+  nginx-consul:
+    image: nginx-consul:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+#    hostname: "{{.Service.Name}}.{{.Node.Hostname}}"
+    environment:
+
+#      CONSUL: "consul:8500"
+#      CONSUL_TOKEN: "" # token-uuid
+#      CONSUL_PREFIX: "/services/nginx-ingress"    
+
+#      CONF: |
+        # plain nginx config
+
+#      STREAM: |
+#        log_format main '$$remote_addr - - [$$time_local] $$protocol $$status $$bytes_sent $$bytes_received $$session_time "$$upstream_addr"';
+#        access_log /var/log/nginx/access.log main;        
+#        upstream db {
+#          server mysql:3306;
+#        }
+#        server {
+#          listen 3306;
+#          proxy_pass db;
+#        }
+
+    restart: always
+
+#    command: ["nginx", "-g", "daemon off;"]
+#    command: ["reload.sh"]
+
+#    ports:
+#      - target: 3306
+#        published: 3306
+#        mode: host
+
+#    ports:
+#      - target: 80
+#        published: 80
+#        mode: host
+#      - target: 443
+#        published: 443
+#        mode: host
+#      - target: 5000
+#        published: 5000
+#        mode: host
+#       # SSH
+#      - target: 2222
+#        published: 2222
+#        mode: host
+#      - target: 8080
+#        published: 8080
+#        mode: host
+
+#networks:
+#  default:
+#    external:
+#      name: "internal-network"

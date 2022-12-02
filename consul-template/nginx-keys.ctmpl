@@ -1,0 +1,84 @@
+#!/bin/bash
+
+{{ $prefix := env "CONSUL_PREFIX" }}
+DATA_DIR=${DATA_DIR:=/data}
+SSL_BASE=${DATA_DIR}/ssl
+
+# Cleanup previous configs
+rm -rf ${DATA_DIR}/*.conf \
+       ${DATA_DIR}/*.inc \
+       ${DATA_DIR}/*.txt \
+       ${DATA_DIR}/conf.d \
+       ${DATA_DIR}/stream.d \
+       ${DATA_DIR}/keys \
+       ${DATA_DIR}/ssl \
+       2> /dev/null
+
+cp ${DATA_DIR}/nginx.conf.source ${DATA_DIR}/nginx.conf 2> /dev/null
+
+{{ with $source := tree $prefix | explode }}
+
+{{ range $ssl, $sslPairs := $source.ssl }}
+# SSL {{ $ssl }}
+  mkdir -p $SSL_BASE/{{ $ssl }}
+  touch $SSL_BASE/{{ $ssl }}.inc
+  {{ if $sslPairs.crt }}
+    echo {{ $sslPairs.crt | base64Encode }} | base64 -d > $SSL_BASE/{{ $ssl }}/server.crt
+    echo "ssl_certificate $SSL_BASE/{{ $ssl }}/server.crt;" >> $SSL_BASE/{{ $ssl }}.inc
+  {{ end }}
+  {{ if $sslPairs.key }}
+    echo {{ $sslPairs.key | base64Encode }} | base64 -d > $SSL_BASE/{{ $ssl }}/server.key
+    echo "ssl_certificate_key $SSL_BASE/{{ $ssl }}/server.key;" >> $SSL_BASE/{{ $ssl }}.inc
+  {{ end }}
+{{ end }}
+
+mkdir -p ${DATA_DIR}/conf.d/
+mkdir -p ${DATA_DIR}/stream.d/
+
+{{ range $key, $value := $source }}
+  {{ if ($key | regexMatch "(.conf|.inc|.txt)$") and ( (printf "%T" $value) eq "string") }}
+    # File {{ $key }}
+    echo {{ base64Encode $value }} | base64 -d > ${DATA_DIR}/{{ $key }}
+  {{ end }}
+{{ end }}
+
+{{ range $key, $value := (index $source "conf.d") }}
+  {{ if ($key | regexMatch "(.conf|.inc|.txt)$") and ( (printf "%T" $value) eq "string") }}
+    # Config {{ $key }}
+    echo {{ base64Encode $value }} | base64 -d > ${DATA_DIR}/conf.d/{{ $key }}
+  {{ end }}
+{{ end }}
+
+{{ range $key, $value := (index $source "stream.d") }}
+  {{ if ($key | regexMatch "(.conf|.inc|.txt)$") and ( (printf "%T" $value) eq "string") }}
+    # Config {{ $key }}
+    echo {{ base64Encode $value }} | base64 -d > ${DATA_DIR}/stream.d/{{ $key }}
+  {{ end }}
+{{ end }}
+
+
+{{ range $name, $service := $source.services }}
+
+# Init "{{ $name }}" service
+
+  mkdir -p ${DATA_DIR}/keys/{{ $name }}
+
+  {{ $htpassword := printf "keys/%s.htpasswd" $name }}
+
+  echo "" > ${DATA_DIR}/{{ $htpassword }}
+
+  {{ if $service.restrict }}
+    echo {{ $service.restrict | base64Encode }} | base64 -d >> ${DATA_DIR}/{{ $htpassword }}
+  {{ end }}
+
+  {{ range $user, $passwd := (index $service "restrict-users") }}
+    printf "{{ $user }}:$(openssl passwd -apr1 "{{ $passwd }}")\n" >> ${DATA_DIR}/{{ $htpassword }}
+  {{ end }}
+
+{{ end }}
+
+{{ end }}
+
+cp -r ${DATA_DIR}/* /etc/nginx/
+
+touch /.consul-ready
